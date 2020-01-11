@@ -136,7 +136,7 @@ pub fn init_backend(mut audio_source: impl AudioSource + Send + 'static) {
         std::thread::spawn(move || loop {
             let mut buffer_position: u32 = 0;
             loop {
-                winapi::um::synchapi::WaitForSingleObject(
+                let result = winapi::um::synchapi::WaitForSingleObject(
                     thread_data.event,
                     winapi::um::winbase::INFINITE,
                 );
@@ -147,7 +147,6 @@ pub fn init_backend(mut audio_source: impl AudioSource + Send + 'static) {
 
                 // println!("PADDING: {:?}", padding);
                 let frames_to_write = pNumBufferFrames - padding;
-                // println!("FRAMES TO WRITE: {:?}", frames_to_write);
 
                 let mut buffer: *mut winapi::shared::minwindef::BYTE =
                     std::mem::MaybeUninit::uninit().assume_init();
