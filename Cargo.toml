@@ -1,0 +1,10 @@
+[package]
+name = "broom"
+version = "0.1.0"
+authors = ["Ian Kettlewell"]
+edition = "2018"
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "mmdeviceapi", "combaseapi", "objbase", "audioclient", "audiosessiontypes", "synchapi", "winbase", "minwindef"] }
