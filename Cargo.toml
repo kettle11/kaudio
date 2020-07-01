@@ -1,5 +1,5 @@
 [package]
-name = "broom"
+name = "kaudio"
 version = "0.1.0"
 authors = ["Ian Kettlewell"]
 edition = "2018"
@@ -8,3 +8,6 @@ edition = "2018"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "mmdeviceapi", "combaseapi", "objbase", "audioclient", "audiosessiontypes", "synchapi", "winbase", "minwindef"] }
+
+[dev-dependencies]
+hound = "3.4.0"
