@@ -2,22 +2,24 @@ use crate::*;
 
 pub struct AudioManager {
     current_id: usize,
-    to_audio_thread: std::sync::mpsc::Sender<Message>,
+    to_audio_thread: rtrb::Producer<Message>,
     free_handles: Vec<SoundHandle>,
 }
 
 impl AudioManager {
     pub fn new() -> Self {
-        let (send, receive) = std::sync::mpsc::channel();
+        // 500 messages can be sent at a time.
+        let (producer, consumer) = rtrb::RingBuffer::new(500).split();
+
         let audio_thread = AudioThread {
             sounds: Vec::new(),
             playing_sounds: Vec::new(),
-            incoming_messages: receive,
+            incoming_messages: consumer,
         };
         begin_audio_thread(audio_thread);
         Self {
             current_id: 0,
-            to_audio_thread: send,
+            to_audio_thread: producer,
             free_handles: Vec::new(),
         }
     }
@@ -25,11 +27,11 @@ impl AudioManager {
     pub fn add_sound(&mut self, sound: Sound) -> SoundHandle {
         let handle = if let Some(handle) = self.free_handles.pop() {
             self.to_audio_thread
-                .send(Message::ReplaceSound(sound, handle))
+                .push(Message::ReplaceSound(sound, handle))
                 .unwrap();
             handle
         } else {
-            self.to_audio_thread.send(Message::NewSound(sound)).unwrap();
+            self.to_audio_thread.push(Message::NewSound(sound)).unwrap();
             self.current_id += 1;
             SoundHandle(self.current_id - 1)
         };
@@ -46,7 +48,13 @@ impl AudioManager {
 
     pub fn play_sound(&mut self, sound_handle: SoundHandle) {
         self.to_audio_thread
-            .send(Message::PlaySound(sound_handle))
+            .push(Message::PlaySound(sound_handle))
+            .unwrap();
+    }
+
+    pub fn play_loop(&mut self, sound_handle: SoundHandle) {
+        self.to_audio_thread
+            .push(Message::LoopSound(sound_handle))
             .unwrap();
     }
 }
@@ -55,6 +63,7 @@ enum Message {
     NewSound(Sound),
     ReplaceSound(Sound, SoundHandle),
     PlaySound(SoundHandle),
+    LoopSound(SoundHandle),
 }
 
 #[derive(Copy, Clone)]
@@ -68,12 +77,12 @@ pub struct PlayingSound {
 struct AudioThread {
     sounds: Vec<Sound>,
     playing_sounds: Vec<PlayingSound>,
-    incoming_messages: std::sync::mpsc::Receiver<Message>,
+    incoming_messages: rtrb::Consumer<Message>,
 }
 
 impl AudioThread {
     fn handle_messages(&mut self) {
-        while let Ok(message) = self.incoming_messages.try_recv() {
+        while let Ok(message) = self.incoming_messages.pop() {
             match message {
                 Message::NewSound(sound) => self.sounds.push(sound),
                 Message::ReplaceSound(sound, handle) => self.sounds[handle.0] = sound,
@@ -81,6 +90,11 @@ impl AudioThread {
                     handle,
                     offset: 0,
                     repeat: false,
+                }),
+                Message::LoopSound(handle) => self.playing_sounds.push(PlayingSound {
+                    handle,
+                    offset: 0,
+                    repeat: true,
                 }),
             }
         }
@@ -95,7 +109,7 @@ impl AudioSource for AudioThread {
         // The following looks like a bunch of code but all it is doing is playing sounds,
         // and potentially looping them.
         // Sounds to be removed are flagged as such and removed later.
-        // The removal algorithm works by ensuring items to be removed are 
+        // The removal algorithm works by ensuring items to be removed are
         // always at the end of the array.
         let channels = 2;
         let samples_length = samples.len();
@@ -112,6 +126,7 @@ impl AudioSource for AudioThread {
             let mut will_remove = false;
             // Repeatedly read from sound buffer until output buffer is full
             // or sound is complete.
+
             while length_total > 0 {
                 let read_length = (sound_length - playing_sound.offset).min(length_total);
                 for i in (0..read_length).step_by(channels) {
