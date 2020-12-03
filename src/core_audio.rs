@@ -186,7 +186,7 @@ pub fn begin_audio_thread(audio_source: impl AudioSource + 'static) {
             panic!("ERROR CREATING AUDIO COMPONENT");
         }
 
-        println!("Stream Description: {:?}", stream_description);
+        // println!("Stream Description: {:?}", stream_description);
 
         // Now initialize the stream with the formats we want.
 

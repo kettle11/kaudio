@@ -16,5 +16,7 @@ pub trait AudioSource {
 mod sound;
 pub use sound::*;
 
+#[cfg(feature = "audio_manager")]
 mod audio_manager;
+#[cfg(feature = "audio_manager")]
 pub use audio_manager::*;
