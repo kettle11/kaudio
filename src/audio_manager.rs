@@ -111,7 +111,7 @@ impl AudioSource for AudioThread {
         // Sounds to be removed are flagged as such and removed later.
         // The removal algorithm works by ensuring items to be removed are
         // always at the end of the array.
-        let channels = 2;
+        let output_channels = 2;
         let samples_length = samples.len();
 
         let playing_sound_count = self.playing_sounds.len();
@@ -124,16 +124,24 @@ impl AudioSource for AudioThread {
             let sound_length = sound.data.len();
 
             let mut will_remove = false;
+
+            let input_channels = (sound.channels as usize).min(output_channels);
+
             // Repeatedly read from sound buffer until output buffer is full
             // or sound is complete.
 
             while length_total > 0 {
                 let read_length = (sound_length - playing_sound.offset).min(length_total);
-                for i in (0..read_length).step_by(channels) {
-                    for j in 0..2 {
-                        samples[i + j] += sound.data[playing_sound.offset + j];
+                for i in (0..read_length).step_by(output_channels) {
+                    for j in 0..output_channels {
+                        // The .min(input_channels-1) here means that the last channel
+                        // of the sound will be copied to extra output channels.
+                        // So a mono-channel will be copied to both output channels.
+                        let sample = sound.data[playing_sound.offset + j.min(input_channels-1)];
+                        let sample_i16 = (sample * (i16::MAX as f32)) as i16;
+                        samples[i + j] += sample_i16;
                     }
-                    playing_sound.offset += channels;
+                    playing_sound.offset += input_channels;
                 }
 
                 if playing_sound.offset >= sound_length {

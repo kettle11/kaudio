@@ -230,7 +230,7 @@ pub fn begin_audio_thread(audio_source: impl AudioSource + 'static) {
         }
 
         let callback = AURenderCallbackStruct {
-            inputProc: test_callback,
+            inputProc: callback,
             inputProcRefCon: Box::into_raw(Box::new(CallbackWrapper {
                 audio_source: Box::new(audio_source),
             })) as *mut c_void,
@@ -276,7 +276,7 @@ pub struct AudioBuffer {
     pub mData: *mut ::std::os::raw::c_void,
 }
 */
-unsafe extern "C" fn test_callback(
+unsafe extern "C" fn callback(
     in_ref_con: *mut ::std::os::raw::c_void,
     _io_action_flags: *mut AudioUnitRenderActionFlags,
     _in_time_stamp: *const AudioTimeStamp,
@@ -291,14 +291,13 @@ unsafe extern "C" fn test_callback(
     );
 
     // The data does not necessarily have to be zeroed if the user callback will zero it,
-    // but unitialized memory can be quite painful on the ears if allowed to slip through.
-
+    // but uninitialized memory can be quite painful on the ears if allowed to slip through.
     for b in data.iter_mut() {
         *b = 0;
     }
 
+    // Call user callback.
     (*callback_wrapper).audio_source.provide_samples(data);
-    // Call user callback here.
 
     return 0;
 }
