@@ -142,7 +142,7 @@ pub struct AudioStreamBasicDescription {
 
 use crate::AudioSource;
 
-pub fn begin_audio_thread(audio_source: impl AudioSource + 'static) {
+pub fn begin_audio_thread(mut audio_source: impl AudioSource + 'static) {
     // Relevant Apple example documentation here:
     // https://developer.apple.com/library/archive/technotes/tn2091/_index.html
 
@@ -228,6 +228,8 @@ pub fn begin_audio_thread(audio_source: impl AudioSource + 'static) {
         if result != 0 {
             panic!("ERROR CREATING AUDIO COMPONENT");
         }
+
+        audio_source.initialize(frame_size as usize);
 
         let callback = AURenderCallbackStruct {
             inputProc: callback,

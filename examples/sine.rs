@@ -11,6 +11,7 @@ struct SineSource {
 }
 
 impl AudioSource for SineSource {
+    fn initialize(&mut self, frame_size: usize) {}
     fn provide_samples(&mut self, samples: &mut [i16]) {
         // Play a middle C
         let step_size = (std::f64::consts::PI * 2.0 * 261.63) / 44100.0;

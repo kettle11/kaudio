@@ -10,6 +10,7 @@ mod core_audio;
 pub use core_audio::*;
 
 pub trait AudioSource {
+    fn initialize(&mut self, frame_size: usize);
     fn provide_samples(&mut self, samples: &mut [i16]);
 }
 
@@ -20,3 +21,11 @@ pub use sound::*;
 mod audio_manager;
 #[cfg(feature = "audio_manager")]
 pub use audio_manager::*;
+
+#[cfg(feature = "wav")]
+mod wav;
+#[cfg(feature = "wav")]
+pub use wav::*;
+
+mod spatial_audio_manager;
+pub use spatial_audio_manager::*;
