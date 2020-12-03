@@ -13,16 +13,22 @@ impl Sound {
 
 /// Resample interleaved audio.
 pub fn resample(data: &Vec<f32>, channels: usize, old_rate: f32, new_rate: f32) -> Vec<f32> {
-    let step = new_rate / old_rate;
+    let step = old_rate / new_rate;
 
     let mut samples = Vec::with_capacity(new_rate as usize * channels);
+    let last_sample = data.len() - 1;
     for i in 0..data.len() / channels {
-        let position = i as f32 * channels as f32 * step;
-
         for j in 0..channels {
-            let p = position as usize + j;
-            let start = data[p];
-            let value = (data[p + channels] - start) * position.fract() + start;
+            // Find the offset for this single channel
+            let start_position = i as f32 * step;
+
+            let start_index = (start_position as usize * channels + j).min(last_sample);
+            let end_index = (start_index + channels).min(last_sample);
+
+            let start = data[start_index];
+            let end = data[end_index];
+
+            let value = (end - start) * start_position.fract() + start;
             samples.push(value);
         }
     }

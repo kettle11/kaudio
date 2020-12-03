@@ -102,7 +102,7 @@ impl AudioThread {
 }
 
 impl AudioSource for AudioThread {
-    fn provide_samples(&mut self, samples: &mut [i16]) {
+    fn provide_samples(&mut self, ouput_samples: &mut [i16]) {
         // Should this be moved to a post update step?
         self.handle_messages();
 
@@ -112,7 +112,7 @@ impl AudioSource for AudioThread {
         // The removal algorithm works by ensuring items to be removed are
         // always at the end of the array.
         let output_channels = 2;
-        let samples_length = samples.len();
+        let samples_length = ouput_samples.len();
 
         let playing_sound_count = self.playing_sounds.len();
         let mut to_delete = 0;
@@ -137,9 +137,9 @@ impl AudioSource for AudioThread {
                         // The .min(input_channels-1) here means that the last channel
                         // of the sound will be copied to extra output channels.
                         // So a mono-channel will be copied to both output channels.
-                        let sample = sound.data[playing_sound.offset + j.min(input_channels-1)];
+                        let sample = sound.data[playing_sound.offset + j.min(input_channels - 1)];
                         let sample_i16 = (sample * (i16::MAX as f32)) as i16;
-                        samples[i + j] += sample_i16;
+                        ouput_samples[i + j] += sample_i16;
                     }
                     playing_sound.offset += input_channels;
                 }
