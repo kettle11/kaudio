@@ -1,6 +1,6 @@
 use crate::{resample, Sound};
 
-pub fn load_wav(path: &str, scale: f32) -> Result<crate::Sound, hound::Error> {
+pub fn load_wav(path: &str) -> Result<crate::Sound, hound::Error> {
     let mut reader = hound::WavReader::open(path)?;
 
     let spec = reader.spec();
@@ -9,19 +9,19 @@ pub fn load_wav(path: &str, scale: f32) -> Result<crate::Sound, hound::Error> {
         hound::SampleFormat::Int => match spec.bits_per_sample {
             8 => reader
                 .samples::<i8>()
-                .map(|x| (x.unwrap() as f32 / i8::MAX as f32) * scale)
+                .map(|x| (x.unwrap() as f32 / i8::MAX as f32))
                 .collect(),
             16 => reader
                 .samples::<i16>()
-                .map(|x| (x.unwrap() as f32 / i16::MAX as f32) * scale)
+                .map(|x| (x.unwrap() as f32 / i16::MAX as f32))
                 .collect(),
             24 => reader
                 .samples::<i32>()
-                .map(|x| (x.unwrap() as f32 / 8388607.) * scale)
+                .map(|x| (x.unwrap() as f32 / 8388607.))
                 .collect(),
             32 => reader
                 .samples::<i32>()
-                .map(|x| (x.unwrap() as f32 / i32::MAX as f32) * scale)
+                .map(|x| (x.unwrap() as f32 / i32::MAX as f32))
                 .collect(),
             _ => unimplemented!(),
         },
@@ -38,8 +38,5 @@ pub fn load_wav(path: &str, scale: f32) -> Result<crate::Sound, hound::Error> {
         );
     }
 
-    Ok(Sound {
-        data: samples,
-        channels: spec.channels as u8,
-    })
+    Ok(Sound::new(samples, spec.channels as u8))
 }
