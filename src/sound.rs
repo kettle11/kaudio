@@ -6,7 +6,7 @@ pub struct Sound {
 }
 
 impl Sound {
-    pub fn new(mut data: Vec<f32>, channels: u8) -> Self {
+    pub fn new(data: Vec<f32>, channels: u8) -> Self {
         Self { data, channels }
     }
 }

@@ -1,31 +1,23 @@
 use kaudio::*;
 
 fn main() {
+    // This example assumes a wav file with a single channel.
     let sound = load_wav("examples/bell.wav").unwrap();
-    let source = FileSource { offset: 0, sound };
 
-    begin_audio_thread(source);
-    loop {}
-}
+    let mut offset = 0;
+    begin_audio_thread(move |samples, stream_info| {
+        let channels = stream_info.channels() as usize;
 
-struct FileSource {
-    offset: usize,
-    sound: Sound,
-}
-
-impl AudioSource for FileSource {
-    fn initialize(&mut self, frame_size: usize) {}
-    fn provide_samples(&mut self, samples: &mut [f32]) {
-        let channels = 2;
         for i in (0..samples.len()).step_by(channels) {
-            for j in 0..2 {
-                samples[i + j] = self.sound.data[self.offset + j]
+            for j in 0..channels {
+                samples[i + j] = sound.data[offset]
             }
-            self.offset += channels;
+            offset += 1;
 
-            if self.offset >= self.sound.data.len() {
-                self.offset = 0;
+            if offset >= sound.data.len() {
+                offset = 0;
             }
         }
-    }
+    });
+    loop {}
 }

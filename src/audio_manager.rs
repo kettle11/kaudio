@@ -11,12 +11,14 @@ impl AudioManager {
         // 500 messages can be sent at a time.
         let (producer, consumer) = rtrb::RingBuffer::new(500).split();
 
-        let audio_thread = AudioThread {
+        let mut audio_thread = AudioThread {
             sounds: Vec::new(),
             playing_sounds: Vec::new(),
             incoming_messages: consumer,
         };
-        begin_audio_thread(audio_thread);
+        begin_audio_thread(move |samples, stream_info| {
+            audio_thread.provide_samples(samples, stream_info)
+        });
         Self {
             current_id: 0,
             to_audio_thread: producer,
@@ -101,10 +103,8 @@ impl AudioThread {
     }
 }
 
-impl AudioSource for AudioThread {
-    fn initialize(&mut self, _frame_size: usize) {}
-
-    fn provide_samples(&mut self, ouput_samples: &mut [f32]) {
+impl AudioThread {
+    fn provide_samples(&mut self, ouput_samples: &mut [f32], _stream_info: StreamInfo) {
         // Should this be moved to a post update step?
         self.handle_messages();
 

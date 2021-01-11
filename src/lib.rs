@@ -9,10 +9,12 @@ mod core_audio;
 #[cfg(target_os = "macos")]
 pub use core_audio::*;
 
+/*
 pub trait AudioSource {
     fn initialize(&mut self, frame_size: usize);
     fn provide_samples(&mut self, samples: &mut [f32]);
 }
+*/
 
 mod sound;
 pub use sound::*;
@@ -29,3 +31,18 @@ pub use wav::*;
 
 mod spatial_audio_manager;
 pub use spatial_audio_manager::*;
+
+pub struct StreamInfo {
+    sample_rate: u32,
+    channels: u32,
+}
+
+impl StreamInfo {
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    pub fn channels(&self) -> u32 {
+        self.channels
+    }
+}

@@ -1,4 +1,6 @@
 use std::ffi::c_void;
+
+use crate::StreamInfo;
 #[link(name = "AudioToolbox", kind = "framework")]
 extern "C" {}
 
@@ -41,7 +43,7 @@ type AudioUnitScope = u32;
 type AudioUnitElement = u32;
 
 #[repr(C)]
-pub struct AudioComponentDescription {
+struct AudioComponentDescription {
     pub componentType: OSType,
     pub componentSubType: OSType,
     pub componentManufacturer: OSType,
@@ -81,12 +83,12 @@ extern "C" {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct AURenderCallbackStruct {
+struct AURenderCallbackStruct {
     pub inputProc: AURenderCallback,
     pub inputProcRefCon: *mut ::std::os::raw::c_void,
 }
 
-pub type AURenderCallback = unsafe extern "C" fn(
+type AURenderCallback = unsafe extern "C" fn(
     inRefCon: *mut ::std::os::raw::c_void,
     ioActionFlags: *mut AudioUnitRenderActionFlags,
     inTimeStamp: *const AudioTimeStamp,
@@ -96,19 +98,20 @@ pub type AURenderCallback = unsafe extern "C" fn(
 ) -> OSStatus;
 
 #[repr(C)]
-pub struct AudioBufferList {
+struct AudioBufferList {
     pub mNumberBuffers: u32,
     pub mBuffers: [AudioBuffer; 1usize],
 }
 
+#[derive(Debug)]
 #[repr(C)]
-pub struct AudioBuffer {
+struct AudioBuffer {
     pub mNumberChannels: u32,
     pub mDataByteSize: u32,
     pub mData: *mut ::std::os::raw::c_void,
 }
 
-pub struct AudioTimeStamp {
+struct AudioTimeStamp {
     pub mSampleTime: f64,
     pub mHostTime: u64,
     pub mRateScalar: f64,
@@ -118,16 +121,15 @@ pub struct AudioTimeStamp {
     pub mReserved: u32,
 }
 
-pub type AudioUnitRenderActionFlags = u32;
-pub type AudioUnitSampleType = f32;
-pub type AudioFormatID = u32;
-pub type AudioFormatFlags = u32;
+type AudioUnitRenderActionFlags = u32;
+type AudioFormatID = u32;
+type AudioFormatFlags = u32;
 
 /// Official documentation:
 /// https://developer.apple.com/documentation/coreaudiotypes/audiostreambasicdescription
 #[repr(C)]
 #[derive(Default, Debug)]
-pub struct AudioStreamBasicDescription {
+struct AudioStreamBasicDescription {
     pub mSampleRate: f64,
     pub mFormatID: AudioFormatID,
     pub mFormatFlags: AudioFormatFlags,
@@ -139,9 +141,11 @@ pub struct AudioStreamBasicDescription {
     pub mReserved: u32,
 }
 
-use crate::AudioSource;
-
-pub fn begin_audio_thread(mut audio_source: impl AudioSource + 'static) {
+type AudioOutputFormat = f32;
+const SAMPLE_RATE: u32 = 44100;
+pub fn begin_audio_thread(
+    audio_callback: impl FnMut(&mut [AudioOutputFormat], StreamInfo) + Send + 'static,
+) {
     // Relevant Apple example documentation here:
     // https://developer.apple.com/library/archive/technotes/tn2091/_index.html
 
@@ -185,19 +189,22 @@ pub fn begin_audio_thread(mut audio_source: impl AudioSource + 'static) {
             panic!("ERROR CREATING AUDIO COMPONENT");
         }
 
-        // println!("Stream Description: {:?}", stream_description);
+        //println!("Stream Description: {:?}", stream_description);
 
+        let channels = 1;
+
+        let bytes_per_frame = channels * std::mem::size_of::<AudioOutputFormat>() as u32;
+        let frames_per_packet = 1;
         // Now initialize the stream with the formats we want.
-
         let mut stream_description = AudioStreamBasicDescription {
             mFormatID: kAudioFormatLinearPCM,
             mFormatFlags: kAudioFormatFlagsNativeFloatPacked,
-            mChannelsPerFrame: 2, // This should be adjustable later
-            mSampleRate: 44100.0,
-            mFramesPerPacket: 1,
-            mBitsPerChannel: 32, // Mac's output is f32, iOS's is i16. So this incurs some overhead on iOS.
-            mBytesPerFrame: 2 * std::mem::size_of::<f32>() as u32, // 2 channels of 2 bytes each.
-            mBytesPerPacket: 2 * std::mem::size_of::<f32>() as u32, // Same as bytes per frame
+            mChannelsPerFrame: channels, // This should be adjustable later
+            mSampleRate: SAMPLE_RATE as f64,
+            mFramesPerPacket: frames_per_packet,
+            mBitsPerChannel: (std::mem::size_of::<AudioOutputFormat>() * 8) as u32, // Mac's output is f32, iOS's is i16. So this incurs some overhead on iOS.
+            mBytesPerFrame: bytes_per_frame,
+            mBytesPerPacket: bytes_per_frame * frames_per_packet,
             mReserved: 0,
         };
 
@@ -214,7 +221,8 @@ pub fn begin_audio_thread(mut audio_source: impl AudioSource + 'static) {
             panic!("ERROR CREATING AUDIO COMPONENT");
         }
 
-        let frame_size = 1024; // This should be adjustable
+        /*
+        let frame_size = 512; // This should be adjustable
         let result = AudioUnitSetProperty(
             audio_unit,
             kAudioDevicePropertyBufferFrameSize,
@@ -227,13 +235,14 @@ pub fn begin_audio_thread(mut audio_source: impl AudioSource + 'static) {
         if result != 0 {
             panic!("ERROR CREATING AUDIO COMPONENT");
         }
+        */
 
-        audio_source.initialize(frame_size as usize);
+        // audio_source.initialize(frame_size as usize);
 
         let callback = AURenderCallbackStruct {
             inputProc: callback,
             inputProcRefCon: Box::into_raw(Box::new(CallbackWrapper {
-                audio_source: Box::new(audio_source),
+                audio_source: Box::new(audio_callback),
             })) as *mut c_void,
         };
 
@@ -264,19 +273,6 @@ pub fn begin_audio_thread(mut audio_source: impl AudioSource + 'static) {
     }
 }
 
-/* #[repr(C)]
-pub struct AudioBufferList {
-    pub mNumberBuffers: u32,
-    pub mBuffers: [AudioBuffer; 1usize],
-}
-
-#[repr(C)]
-pub struct AudioBuffer {
-    pub mNumberChannels: u32,
-    pub mDataByteSize: u32,
-    pub mData: *mut ::std::os::raw::c_void,
-}
-*/
 unsafe extern "C" fn callback(
     in_ref_con: *mut ::std::os::raw::c_void,
     _io_action_flags: *mut AudioUnitRenderActionFlags,
@@ -286,9 +282,10 @@ unsafe extern "C" fn callback(
     io_data: *mut AudioBufferList,
 ) -> i32 {
     let callback_wrapper: *mut CallbackWrapper = in_ref_con as *mut CallbackWrapper;
-    let data: &mut [f32] = std::slice::from_raw_parts_mut(
-        (*io_data).mBuffers[0].mData as *mut f32,
-        ((*io_data).mBuffers[0].mDataByteSize / std::mem::size_of::<f32>() as u32) as usize,
+    let data: &mut [AudioOutputFormat] = std::slice::from_raw_parts_mut(
+        (*io_data).mBuffers[0].mData as *mut AudioOutputFormat,
+        ((*io_data).mBuffers[0].mDataByteSize / std::mem::size_of::<AudioOutputFormat>() as u32)
+            as usize,
     );
 
     // The data does not necessarily have to be zeroed if the user callback will zero it,
@@ -297,12 +294,18 @@ unsafe extern "C" fn callback(
         *b = 0.;
     }
 
+    let channels = (*io_data).mBuffers[0].mNumberChannels;
+    let stream_info = StreamInfo {
+        channels,
+        sample_rate: 44100,
+    };
+
     // Call user callback.
-    (*callback_wrapper).audio_source.provide_samples(data);
+    ((*callback_wrapper).audio_source)(data, stream_info);
 
     return 0;
 }
 
 struct CallbackWrapper {
-    audio_source: Box<dyn AudioSource>,
+    audio_source: Box<dyn FnMut(&mut [AudioOutputFormat], StreamInfo) + Send + 'static>,
 }

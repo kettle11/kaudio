@@ -26,7 +26,6 @@ pub fn load_wav(path: &str) -> Result<crate::Sound, hound::Error> {
             _ => unimplemented!(),
         },
     };
-    println!("SPEC: {:?}", spec);
 
     // Resample audio if it doesn't match our desired sample rate.
     if spec.sample_rate != 44100 {

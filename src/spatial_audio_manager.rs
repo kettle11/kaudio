@@ -44,7 +44,7 @@ impl SpatialAudioManager {
 
         // A loud alarm clock measured in microwatts.
         let max_default = 20.;
-        let audio_thread = AudioThread {
+        let mut audio_thread = AudioThread {
             sounds: Vec::new(),
             playing_sounds: Vec::new(),
             incoming_messages: consumer,
@@ -52,7 +52,7 @@ impl SpatialAudioManager {
             max_value: max_default,
             max_default,
         };
-        begin_audio_thread(audio_thread);
+        begin_audio_thread(move |output_samples, _| audio_thread.provide_samples(output_samples));
         Self {
             current_id: 0,
             to_audio_thread: producer,
@@ -151,10 +151,7 @@ impl AudioThread {
     }
 }
 
-impl AudioSource for AudioThread {
-    fn initialize(&mut self, frame_size: usize) {
-        self.frame_buffer.resize(frame_size, 0.);
-    }
+impl AudioThread {
     fn provide_samples(&mut self, output_samples: &mut [f32]) {
         // Should this be moved to a post update step?
         self.handle_messages();
@@ -184,7 +181,7 @@ impl AudioSource for AudioThread {
 
             let mut will_remove = false;
 
-            let mut attenuation = playing_sound.radius / playing_sound.distance;
+            let attenuation = playing_sound.radius / playing_sound.distance;
             // Repeatedly read from sound buffer until output buffer is full
             // or sound is complete.
 
