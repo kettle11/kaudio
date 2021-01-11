@@ -104,7 +104,7 @@ impl AudioThread {
 impl AudioSource for AudioThread {
     fn initialize(&mut self, _frame_size: usize) {}
 
-    fn provide_samples(&mut self, ouput_samples: &mut [i16]) {
+    fn provide_samples(&mut self, ouput_samples: &mut [f32]) {
         // Should this be moved to a post update step?
         self.handle_messages();
 
@@ -140,8 +140,8 @@ impl AudioSource for AudioThread {
                         // of the sound will be copied to extra output channels.
                         // So a mono-channel will be copied to both output channels.
                         let sample = sound.data[playing_sound.offset + j.min(input_channels - 1)];
-                        let sample_i16 = (sample * (i16::MAX as f32)) as i16;
-                        ouput_samples[i + j] += sample_i16;
+                        //  let sample_i16 = (sample * (i16::MAX as f32)) as i16;
+                        ouput_samples[i + j] += sample;
                     }
                     playing_sound.offset += input_channels;
                 }

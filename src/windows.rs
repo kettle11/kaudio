@@ -2,7 +2,7 @@ extern crate winapi;
 use crate::windows::winapi::Interface;
 
 pub trait AudioSource {
-    fn provide_samples(&mut self, samples: &mut [i16]);
+    fn provide_samples(&mut self, samples: &mut [f32]);
     fn handle_event() {}
 }
 

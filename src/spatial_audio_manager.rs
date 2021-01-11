@@ -155,7 +155,7 @@ impl AudioSource for AudioThread {
     fn initialize(&mut self, frame_size: usize) {
         self.frame_buffer.resize(frame_size, 0.);
     }
-    fn provide_samples(&mut self, output_samples: &mut [i16]) {
+    fn provide_samples(&mut self, output_samples: &mut [f32]) {
         // Should this be moved to a post update step?
         self.handle_messages();
 
@@ -259,7 +259,7 @@ impl AudioSource for AudioThread {
             .zip(self.frame_buffer.iter())
             .for_each(|(o, i)| {
                 let normalized = *i / self.max_value;
-                *o = (normalized * i16::MAX as f32) as i16
+                *o = normalized; //(normalized * i16::MAX as f32) as i16
             });
 
         if to_delete > 0 {

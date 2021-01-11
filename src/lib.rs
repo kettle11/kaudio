@@ -11,7 +11,7 @@ pub use core_audio::*;
 
 pub trait AudioSource {
     fn initialize(&mut self, frame_size: usize);
-    fn provide_samples(&mut self, samples: &mut [i16]);
+    fn provide_samples(&mut self, samples: &mut [f32]);
 }
 
 mod sound;

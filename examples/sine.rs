@@ -12,7 +12,7 @@ struct SineSource {
 
 impl AudioSource for SineSource {
     fn initialize(&mut self, frame_size: usize) {}
-    fn provide_samples(&mut self, samples: &mut [i16]) {
+    fn provide_samples(&mut self, samples: &mut [f32]) {
         // Play a middle C
         let step_size = (std::f64::consts::PI * 2.0 * 261.63) / 44100.0;
 
@@ -21,7 +21,7 @@ impl AudioSource for SineSource {
             let v = f64::sin(self.time * 1.0);
 
             for j in 0..2 {
-                samples[i + j] = (std::i16::MAX as f64 * v * 0.7) as i16;
+                samples[i + j] = v as f32 * 0.7;
             }
 
             self.time += step_size;

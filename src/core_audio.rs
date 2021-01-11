@@ -2,43 +2,43 @@ use std::ffi::c_void;
 #[link(name = "AudioToolbox", kind = "framework")]
 extern "C" {}
 
-pub type FourCharCode = u32;
-pub type OSType = FourCharCode;
+type FourCharCode = u32;
+type OSType = FourCharCode;
 
-pub const kAudioUnitType_Output: u32 = 1635086197;
-pub const kAudioUnitSubType_HALOutput: u32 = 1634230636;
-pub const kAudioUnitManufacturer_Apple: u32 = 1634758764;
-pub const kAudioUnitScope_Input: u32 = 1;
-pub const kAudioUnitScope_Output: u32 = 2;
-pub const kAudioUnitProperty_StreamFormat: u32 = 8;
-pub const kAudioFormatLinearPCM: u32 = 1819304813;
-pub const kAudioFormatFlagIsSignedInteger: u32 = 4;
-pub const kAudioFormatFlagIsPacked: u32 = 8;
-pub const kAudioDevicePropertyBufferFrameSize: u32 = 1718839674;
-pub const kAudioUnitScope_Global: u32 = 0;
-pub const kAudioOutputUnitProperty_SetInputCallback: u32 = 2005;
-pub const kAudioUnitProperty_SetRenderCallback: u32 = 23;
+const kAudioUnitType_Output: u32 = 1635086197;
+const kAudioUnitSubType_HALOutput: u32 = 1634230636;
+const kAudioUnitManufacturer_Apple: u32 = 1634758764;
+const kAudioUnitScope_Input: u32 = 1;
+const kAudioUnitScope_Output: u32 = 2;
+const kAudioUnitProperty_StreamFormat: u32 = 8;
+const kAudioFormatLinearPCM: u32 = 1819304813;
+const kAudioFormatFlagIsFloat: u32 = 1 << 0;
+const kAudioFormatFlagIsPacked: u32 = 8;
+const kAudioDevicePropertyBufferFrameSize: u32 = 1718839674;
+const kAudioUnitScope_Global: u32 = 0;
+const kAudioUnitProperty_SetRenderCallback: u32 = 23;
+const kAudioFormatFlagsNativeEndian: u32 = 0;
+const kAudioFormatFlagsNativeFloatPacked: u32 =
+    kAudioFormatFlagIsFloat | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked;
+const kOutputBus: u32 = 0;
 
-pub const kOutputBus: u32 = 0;
-pub const kInputBus: u32 = 1;
-
-pub type OSStatus = i32;
+type OSStatus = i32;
 #[repr(C)]
-pub struct OpaqueAudioComponent {
+struct OpaqueAudioComponent {
     _unused: [u8; 0],
 }
 
 #[repr(C)]
-pub struct ComponentInstanceRecord {
+struct ComponentInstanceRecord {
     _unused: [u8; 0],
 }
 
-pub type AudioComponent = *mut OpaqueAudioComponent;
-pub type AudioComponentInstance = *mut ComponentInstanceRecord;
-pub type AudioUnit = AudioComponentInstance;
-pub type AudioUnitPropertyID = u32;
-pub type AudioUnitScope = u32;
-pub type AudioUnitElement = u32;
+type AudioComponent = *mut OpaqueAudioComponent;
+type AudioComponentInstance = *mut ComponentInstanceRecord;
+type AudioUnit = AudioComponentInstance;
+type AudioUnitPropertyID = u32;
+type AudioUnitScope = u32;
+type AudioUnitElement = u32;
 
 #[repr(C)]
 pub struct AudioComponentDescription {
@@ -50,16 +50,16 @@ pub struct AudioComponentDescription {
 }
 
 extern "C" {
-    pub fn AudioComponentFindNext(
+    fn AudioComponentFindNext(
         inComponent: AudioComponent,
         inDesc: *const AudioComponentDescription,
     ) -> AudioComponent;
-    pub fn AudioComponentInstanceNew(
+    fn AudioComponentInstanceNew(
         inComponent: AudioComponent,
         outInstance: *mut AudioComponentInstance,
     ) -> OSStatus;
-    pub fn AudioUnitInitialize(inUnit: AudioUnit) -> OSStatus;
-    pub fn AudioUnitGetProperty(
+    fn AudioUnitInitialize(inUnit: AudioUnit) -> OSStatus;
+    fn AudioUnitGetProperty(
         inUnit: AudioUnit,
         inID: AudioUnitPropertyID,
         inScope: AudioUnitScope,
@@ -68,7 +68,7 @@ extern "C" {
         ioDataSize: *mut u32,
     ) -> OSStatus;
 
-    pub fn AudioUnitSetProperty(
+    fn AudioUnitSetProperty(
         inUnit: AudioUnit,
         inID: AudioUnitPropertyID,
         inScope: AudioUnitScope,
@@ -76,7 +76,7 @@ extern "C" {
         inData: *const ::std::os::raw::c_void,
         inDataSize: u32,
     ) -> OSStatus;
-    pub fn AudioOutputUnitStart(ci: AudioUnit) -> OSStatus;
+    fn AudioOutputUnitStart(ci: AudioUnit) -> OSStatus;
 }
 
 #[repr(C)]
@@ -119,7 +119,6 @@ pub struct AudioTimeStamp {
 }
 
 pub type AudioUnitRenderActionFlags = u32;
-pub type AudioSampleType = f32;
 pub type AudioUnitSampleType = f32;
 pub type AudioFormatID = u32;
 pub type AudioFormatFlags = u32;
@@ -192,13 +191,13 @@ pub fn begin_audio_thread(mut audio_source: impl AudioSource + 'static) {
 
         let mut stream_description = AudioStreamBasicDescription {
             mFormatID: kAudioFormatLinearPCM,
-            mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
+            mFormatFlags: kAudioFormatFlagsNativeFloatPacked,
             mChannelsPerFrame: 2, // This should be adjustable later
             mSampleRate: 44100.0,
             mFramesPerPacket: 1,
-            mBitsPerChannel: 16, // It is fine to use 16 bits for the final output
-            mBytesPerFrame: 2 * 2, // 2 channels of 2 bytes each.
-            mBytesPerPacket: 2 * 2, // Same as bytes per frame
+            mBitsPerChannel: 32, // Mac's output is f32, iOS's is i16. So this incurs some overhead on iOS.
+            mBytesPerFrame: 2 * std::mem::size_of::<f32>() as u32, // 2 channels of 2 bytes each.
+            mBytesPerPacket: 2 * std::mem::size_of::<f32>() as u32, // Same as bytes per frame
             mReserved: 0,
         };
 
@@ -287,15 +286,15 @@ unsafe extern "C" fn callback(
     io_data: *mut AudioBufferList,
 ) -> i32 {
     let callback_wrapper: *mut CallbackWrapper = in_ref_con as *mut CallbackWrapper;
-    let data: &mut [i16] = std::slice::from_raw_parts_mut(
-        (*io_data).mBuffers[0].mData as *mut i16,
-        ((*io_data).mBuffers[0].mDataByteSize / 2) as usize,
+    let data: &mut [f32] = std::slice::from_raw_parts_mut(
+        (*io_data).mBuffers[0].mData as *mut f32,
+        ((*io_data).mBuffers[0].mDataByteSize / std::mem::size_of::<f32>() as u32) as usize,
     );
 
     // The data does not necessarily have to be zeroed if the user callback will zero it,
     // but uninitialized memory can be quite painful on the ears if allowed to slip through.
     for b in data.iter_mut() {
-        *b = 0;
+        *b = 0.;
     }
 
     // Call user callback.
