@@ -191,7 +191,7 @@ pub fn begin_audio_thread(
 
         //println!("Stream Description: {:?}", stream_description);
 
-        let channels = 1;
+        let channels = 2;
 
         let bytes_per_frame = channels * std::mem::size_of::<AudioOutputFormat>() as u32;
         let frames_per_packet = 1;
