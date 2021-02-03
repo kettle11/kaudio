@@ -52,6 +52,7 @@ impl SpatialAudioManager {
             max_value: max_default,
             max_default,
         };
+
         begin_audio_thread(move |output_samples, _| audio_thread.provide_samples(output_samples));
         Self {
             current_id: 0,

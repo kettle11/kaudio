@@ -9,6 +9,11 @@ mod core_audio;
 #[cfg(target_os = "macos")]
 pub use core_audio::*;
 
+#[cfg(target_arch = "wasm32")]
+mod audio_worklet_web;
+#[cfg(target_arch = "wasm32")]
+pub use audio_worklet_web::*;
+
 /*
 pub trait AudioSource {
     fn initialize(&mut self, frame_size: usize);
