@@ -30,13 +30,42 @@ thread_local! {
     static THREAD_AUDIO_CALLBACK: RefCell<Option<ThreadLocalData>> = RefCell::new(None);
 }
 
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(module = "/src/web_worklet.js")]
+extern "C" {
+    fn setup_worklet(entry_point: u32);
+}
+
 pub fn begin_audio_thread(
     audio_callback: impl FnMut(&mut [AudioOutputFormat], StreamInfo) + Send + 'static,
 ) {
-    // For now we just set a thread local that the host will later use.
+    /*
     THREAD_AUDIO_CALLBACK.with(|f| {
         *f.borrow_mut() = Some(ThreadLocalData {
             callback: Box::new(audio_callback),
+            audio_scratch_buffers: Vec::new(),
+            interleaved_buffer: Vec::new(),
+        });
+    });*/
+
+    // Construct a Box with a Box with a function pointer inside
+    // The function pointer is a fat pointer, which JS can't handle.
+    // So the external Box makes a thin pointer that's passed to JS
+    // The pointer is passed to JS and then passed into the other thread when it initializes.
+    setup_worklet(Box::leak(Box::new(Box::new(audio_callback)
+        as Box<dyn FnMut(&mut [AudioOutputFormat], StreamInfo) + Send + 'static>))
+        as *mut _ as *mut std::ffi::c_void as u32);
+}
+
+#[no_mangle]
+pub extern "C" fn kaudio_thread_initialize(callback: u32) {
+    THREAD_AUDIO_CALLBACK.with(|f| unsafe {
+        let callback_box_ptr = callback as *mut std::ffi::c_void as *mut _;
+        let b: Box<Box<dyn FnMut(&mut [AudioOutputFormat], StreamInfo) + Send + 'static>> =
+            Box::from_raw(callback_box_ptr);
+        *f.borrow_mut() = Some(ThreadLocalData {
+            callback: *b,
             audio_scratch_buffers: Vec::new(),
             interleaved_buffer: Vec::new(),
         });
@@ -57,6 +86,7 @@ pub extern "C" fn kaudio_audio_buffer_location(channel: u32) -> u32 {
 pub extern "C" fn kaudio_run_callback(channels: u32, frame_size: u32, sample_rate: u32) {
     THREAD_AUDIO_CALLBACK.with(|f| {
         let mut thread_local_data = f.borrow_mut();
+
         let thread_local_data = thread_local_data.as_mut().unwrap();
 
         thread_local_data.resize(channels, frame_size);
@@ -69,9 +99,11 @@ pub extern "C" fn kaudio_run_callback(channels: u32, frame_size: u32, sample_rat
         (thread_local_data.callback)(&mut thread_local_data.interleaved_buffer, stream_info);
 
         // There has got to be better code (using iterators or something) for deinterleaving an audio buffer.
+        // It's kinda lame that this needs to be done, but other backends require interleaved data.
+        // Unfortunately the web browser will just interleave this again later.
+
         let mut index_in_frame = 0;
         let mut index_in_interleaved_buffer = 0;
-        let steps = thread_local_data.interleaved_buffer.len() / (channels * frame_size) as usize;
         let channels = channels as usize;
         for _ in 0..frame_size {
             for i in 0..channels {
@@ -81,5 +113,19 @@ pub extern "C" fn kaudio_run_callback(channels: u32, frame_size: u32, sample_rat
             }
             index_in_frame += 1;
         }
-    });
+
+        //  let thing = Box::new(true);
+
+        /*
+        unsafe {
+            let thread_local_data = CALLBACK.as_mut().unwrap();
+            let a = &mut thread_local_data.audio_scratch_buffers;
+            // for b in thread_local_data.audio_scratch_buffers.iter() {}
+            // for b in thread_local_data.audio_scratch_buffers.iter_mut() {}
+            //    panic!("HI THERE");
+            //  b.iter_mut().for_each(|i| *i = 0.);
+            //  }
+        }
+        */
+    })
 }

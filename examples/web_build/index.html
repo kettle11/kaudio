@@ -20,7 +20,8 @@
       env: {},
     };
 
-    wasm_memory = imports.env.memory = new WebAssembly.Memory({ initial: 17, maximum: 16384, shared: true });
+    console.log("HI");
+    wasm_memory = imports.env.memory = new WebAssembly.Memory({ initial: 31, maximum: 16384, shared: true });
 
     fetch('sine.wasm').then(response =>
       response.arrayBuffer()
@@ -41,10 +42,10 @@
     });
 
     async function setup_worklet() {
-      const audioContext = new AudioContext()
-      await audioContext.audioWorklet.addModule('audio_worklet.js')
-      const worklet = new AudioWorkletNode(audioContext, 'kaudio-processor')
-      worklet.connect(audioContext.destination)
+      const audioContext = new AudioContext({ sampleRate: 44100 });
+      await audioContext.audioWorklet.addModule('audio_worklet.js');
+      const worklet = new AudioWorkletNode(audioContext, 'kaudio-processor');
+      worklet.connect(audioContext.destination);
       let message = {}
       message.wasm_memory = wasm_memory;
       message.wasm_module = wasm_module;

@@ -24,7 +24,13 @@ class KAudioProcessor extends AudioWorkletProcessor {
                 }
             });
 
-            imports.env.memory = e.data.wasm_memory;
+            if (typeof imports.wbg !== undefined) {
+                // This path is used for wasm-bindgen
+                imports.env.memory = e.data.wasm_memory;
+            } else if (imports.env !== undefined) {
+                // This path is used for kwasm.
+                imports.env.memory = e.data.wasm_memory;
+            }
 
             WebAssembly.instantiate(e.data.wasm_module, imports).then(results => {
                 console.log(results);
@@ -37,12 +43,13 @@ class KAudioProcessor extends AudioWorkletProcessor {
     }
 
     process(inputs, outputs, parameters) {
+        // console.log(sampleRate);
         let channel_count = outputs[0].length;
         let frame_size = outputs[0][0].length; // It's probably fine to assume all channels have the same frame size. 
         this.wasm_exports.kaudio_run_callback(channel_count, frame_size, sampleRate)
 
         // console.log(frame_size);
-        for (let i = 0; i < channel_count; i++) {
+        for (let i = 0; i < 1; i++) {
             let location = this.wasm_exports.kaudio_audio_buffer_location(i)
             //console.log(location);
             let data = new Float32Array(this.wasm_memory.buffer, location, frame_size);

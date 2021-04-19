@@ -10,9 +10,9 @@ mod core_audio;
 pub use core_audio::*;
 
 #[cfg(target_arch = "wasm32")]
-mod audio_worklet_web;
+mod web;
 #[cfg(target_arch = "wasm32")]
-pub use audio_worklet_web::*;
+pub use web::*;
 
 /*
 pub trait AudioSource {
@@ -24,18 +24,10 @@ pub trait AudioSource {
 mod sound;
 pub use sound::*;
 
-#[cfg(feature = "audio_manager")]
-mod audio_manager;
-#[cfg(feature = "audio_manager")]
-pub use audio_manager::*;
-
 #[cfg(feature = "wav")]
 mod wav;
 #[cfg(feature = "wav")]
 pub use wav::*;
-
-mod spatial_audio_manager;
-pub use spatial_audio_manager::*;
 
 pub struct StreamInfo {
     sample_rate: u32,
