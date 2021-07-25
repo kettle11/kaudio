@@ -1,4 +1,5 @@
 extern crate winapi;
+use crate::*;
 use crate::windows::winapi::Interface;
 
 pub trait AudioSource {
@@ -15,11 +16,15 @@ fn check_result(result: winapi::um::winnt::HRESULT) -> Result<(), std::io::Error
     }
 }
 
+type AudioOutputFormat = f32;
+
 // A backend for Windows Audio Session Application Programming Interface (WASAPI)
 // Inspired by sokol_audio.h:
 // https://github.com/floooh/sokol/blob/master/sokol_audio.h
 // And cpal: https://github.com/RustAudio/cpal/blob/master/src/host/wasapi/device.rs
-pub fn init_backend(mut audio_source: impl AudioSource + Send + 'static) {
+pub fn begin_audio_thread(
+    audio_callback: impl FnMut(&mut [AudioOutputFormat], StreamInfo) + Send + 'static,
+) {
     let sample_rate = 44100;
     unsafe {
         let hresult = winapi::um::combaseapi::CoInitializeEx(
@@ -157,8 +162,10 @@ pub fn init_backend(mut audio_source: impl AudioSource + Send + 'static) {
                 let buffer_len = frames_to_write as usize * nChannels as usize;
                 let samples_slice: &mut [i16] =
                     std::slice::from_raw_parts_mut(buffer as *mut i16, buffer_len);
+                samples_slice.fill(0);
 
-                audio_source.provide_samples(samples_slice);
+                // Don't provide audio for now
+               //  audio_source.provide_samples(samples_slice);
                 let hresult = (*thread_data.render_client).ReleaseBuffer(frames_to_write, 0);
                 check_result(hresult).unwrap();
 

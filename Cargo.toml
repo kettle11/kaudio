@@ -6,6 +6,7 @@ edition = "2018"
 
 [features]
 default = ["wav"]
+audio_manager = ["rtrb"]
 wav = ["hound"]
 
 [dependencies]
