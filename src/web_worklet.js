@@ -6,14 +6,12 @@ function run_on_worklet() {
         constructor(...args) {
             super(...args)
             this.port.onmessage = (e) => {
-                console.log("NEW WORKLET");
                 let imports = {};
-                // wbg is declared for compatibility with WasmBindgen.
-                // I'm not sure how necessary it is that this exact name be used
-                // for storing memory within Wasm.
-                // More info is needed.
-                imports.wbg = {};
-                WebAssembly.Module.imports(e.data.wasm_module).forEach(item => {
+                let memory_assigned = false;
+
+                // Fill audio worklet imports with placeholder values.
+                // None of these functions will be called on this worklet thread anyways.
+                WebAssembly.Module.imports(e.data.kwasm_module).forEach(item => {
                     if (imports[item.module] === undefined) {
                         imports[item.module] = {};
                     }
@@ -23,39 +21,48 @@ function run_on_worklet() {
                             console.log(item.name + "is unimplemented in audio worklet");
                         }
                     }
-
                     if (item.kind == "memory") {
-                        imports[item.module][item.name] = {};
+                        imports[item.module][item.name] = e.data.kwasm_memory;
+                        memory_assigned = true;
                     }
                 });
+                if (!memory_assigned) {
+                    imports.env = {
+                        memory: e.data.kwasm_memory
+                    };
+                }
+                this.kwasm_memory = e.data.kwasm_memory;
 
-                imports.wbg.memory = e.data.wasm_memory;
 
-                WebAssembly.instantiate(e.data.wasm_module, imports).then(results => {
-                    this.wasm_exports = results.exports;
-                    this.wasm_memory = e.data.wasm_memory;
-                    // Pass the callback function pointer back to the Wasm module.
-                    // This time running within this AudioWorklet.
-                    //  console.log(e.data.entry_point);
-                    this.wasm_exports.__wbindgen_initialize_thread();
-                    this.wasm_exports.kaudio_thread_initialize(e.data.entry_point);
+                WebAssembly.instantiate(e.data.kwasm_module, imports).then(results => {
+                    let exports = results.exports;
+                    if (exports.__wbindgen_start) {
+                        exports.__wbindgen_start();
+                    } else {
+                        exports.set_stack_pointer(e.data.stack_pointer);
+                        exports.__wasm_init_tls(e.data.thread_local_storage_pointer);
+                    }
+
+                    exports.kwasm_web_worker_entry_point(e.data.entry_point);
+                    this.kwasm_exports = exports;
+
                 });
             }
         }
 
         process(inputs, outputs, parameters) {
-            let channel_count = outputs[0].length;
-            // console.log(channel_count);
-            let frame_size = outputs[0][0].length; // It's probably fine to assume all channels have the same frame size. 
-            this.wasm_exports.kaudio_run_callback(channel_count, frame_size, sampleRate);
+            if (this.kwasm_exports) {
+                let channel_count = outputs[0].length;
+                let frame_size = outputs[0][0].length; // It's probably fine to assume all channels have the same frame size. 
+                this.kwasm_exports.kaudio_run_callback(channel_count, frame_size, sampleRate);
 
-            for (let i = 0; i < channel_count; i++) {
-                let location = this.wasm_exports.kaudio_audio_buffer_location(i);
-                let data = new Float32Array(this.wasm_memory.buffer, location, frame_size);
-                outputs[0][i].set(data);
+                for (let i = 0; i < channel_count; i++) {
+                    let location = this.kwasm_exports.kaudio_audio_buffer_location(i);
+                    let data = new Float32Array(this.kwasm_memory.buffer, location, frame_size);
+                    outputs[0][i].set(data);
+                }
             }
-
-            return true
+            return true;
         }
     }
 
@@ -63,7 +70,7 @@ function run_on_worklet() {
 }
 
 
-export function setup_worklet(entry_point) {
+function setup_worklet(entry_point, stack_pointer, thread_local_storage_pointer) {
 
     document.onpointerdown = (event) => {
         if (!audio_running) {
@@ -91,9 +98,11 @@ export function setup_worklet(entry_point) {
             // Smuggling these values via document properties
             // is hack for now, but it requires a specific index.html setup
             // and should be replaced.
-            message.wasm_memory = document.wasm_memory;
-            message.wasm_module = document.wasm_module;
+            message.kwasm_memory = self.kwasm_memory;
+            message.kwasm_module = self.kwasm_module;
             message.entry_point = entry_point;
+            message.stack_pointer = stack_pointer;
+            message.thread_local_storage_pointer = thread_local_storage_pointer;
 
             worklet.port.postMessage(message);
         }
@@ -101,3 +110,4 @@ export function setup_worklet(entry_point) {
     };
 
 }
+setup_worklet

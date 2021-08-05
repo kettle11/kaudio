@@ -6,14 +6,13 @@ edition = "2018"
 
 [features]
 default = ["wav"]
-audio_manager = ["rtrb"]
 wav = ["hound"]
 
 [dependencies]
 hound = {version = "3.4.0", optional = true}
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
-wasm-bindgen = "0.2.*"
+kwasm = {path = "../kwasm"}
 wasm_set_stack_pointer = {path = "../wasm_set_stack_pointer"}
 
 [target.'cfg(windows)'.dependencies]

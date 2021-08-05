@@ -1,4 +1,5 @@
 pub use crate::*;
+use kwasm::*;
 use std::cell::RefCell;
 
 type AudioOutputFormat = f32;
@@ -26,38 +27,42 @@ impl ThreadLocalData {
     }
 }
 
+// This callback is set and used on the audio worklet thread.
 thread_local! {
     static THREAD_AUDIO_CALLBACK: RefCell<Option<ThreadLocalData>> = RefCell::new(None);
-}
-
-use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen(module = "/src/web_worklet.js")]
-extern "C" {
-    fn setup_worklet(entry_point: u32);
 }
 
 pub fn begin_audio_thread(
     audio_callback: impl FnMut(&mut [AudioOutputFormat], StreamInfo) + Send + 'static,
 ) {
-    /*
-    THREAD_AUDIO_CALLBACK.with(|f| {
-        *f.borrow_mut() = Some(ThreadLocalData {
-            callback: Box::new(audio_callback),
-            audio_scratch_buffers: Vec::new(),
-            interleaved_buffer: Vec::new(),
-        });
-    });*/
+    #[cfg(target_feature = "atomics")]
+    {
+        let worklet_js_code = JSObjectFromString::new(include_str!("web_worklet.js").into());
 
-    // Construct a Box with a Box with a function pointer inside
-    // The function pointer is a fat pointer, which JS can't handle.
-    // So the external Box makes a thin pointer that's passed to JS
-    // The pointer is passed to JS and then passed into the other thread when it initializes.
-    setup_worklet(Box::leak(Box::new(Box::new(audio_callback)
-        as Box<dyn FnMut(&mut [AudioOutputFormat], StreamInfo) + Send + 'static>))
-        as *mut _ as *mut std::ffi::c_void as u32);
+        let (entry_point, stack_pointer, thread_local_storage_memory) = unsafe {
+            kwasm::web_worker::create_worker_data(move || {
+                THREAD_AUDIO_CALLBACK.with(|f| {
+                    *f.borrow_mut() = Some(ThreadLocalData {
+                        callback: Box::new(audio_callback),
+                        audio_scratch_buffers: Vec::new(),
+                        interleaved_buffer: Vec::new(),
+                    });
+                })
+            })
+        };
+
+        // Construct a Box with a Box with a function pointer inside
+        // The function pointer is a fat pointer, which JS can't handle.
+        // So the external Box makes a thin pointer that's passed to JS
+        // The pointer is passed to JS and then passed into the other thread when it initializes.
+        worklet_js_code.call_raw(
+            &JSObject::NULL,
+            &[entry_point, stack_pointer, thread_local_storage_memory],
+        );
+    }
 }
 
+/*
 #[no_mangle]
 pub extern "C" fn kaudio_thread_initialize(callback: u32) {
     THREAD_AUDIO_CALLBACK.with(|f| unsafe {
@@ -71,6 +76,7 @@ pub extern "C" fn kaudio_thread_initialize(callback: u32) {
         });
     });
 }
+*/
 
 // Returns a pointer to the memory location.
 #[no_mangle]

@@ -1,6 +1,6 @@
 extern crate winapi;
-use crate::*;
 use crate::windows::winapi::Interface;
+use crate::*;
 
 pub trait AudioSource {
     fn provide_samples(&mut self, samples: &mut [f32]);
@@ -165,7 +165,7 @@ pub fn begin_audio_thread(
                 samples_slice.fill(0);
 
                 // Don't provide audio for now
-               //  audio_source.provide_samples(samples_slice);
+                //  audio_source.provide_samples(samples_slice);
                 let hresult = (*thread_data.render_client).ReleaseBuffer(frames_to_write, 0);
                 check_result(hresult).unwrap();
 
