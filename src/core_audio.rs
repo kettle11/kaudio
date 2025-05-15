@@ -111,6 +111,7 @@ struct AudioBuffer {
     pub mData: *mut ::std::os::raw::c_void,
 }
 
+#[repr(C)]
 struct AudioTimeStamp {
     pub mSampleTime: f64,
     pub mHostTime: u64,

@@ -1,6 +1,6 @@
 pub use crate::*;
-use kwasm::*;
 use std::cell::RefCell;
+use kwasm::*;
 
 type AudioOutputFormat = f32;
 
@@ -60,6 +60,11 @@ pub fn begin_audio_thread(
             &[entry_point, stack_pointer, thread_local_storage_memory],
         );
     }
+
+    #[cfg(not(target_feature = "atomics"))] {
+        let _ = audio_callback;
+    }
+
 }
 
 /*
